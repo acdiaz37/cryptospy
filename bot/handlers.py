@@ -16,10 +16,63 @@ coingecko = CoinGeckoClient()
 sheets = SheetsClient()
 
 
+def _fmt_price(val: float | None) -> str:
+    return f"${val:,.4f}" if val is not None else "$N/A"
+
+
+def _ticket_status(sig, current_price: float | None = None) -> str:
+    """Formatea una señal estilo ticket/recibo para Telegram."""
+    dir_emoji = "🟢" if sig.direction == "LONG" else "🔴"
+    conf_line = f"📊 Confianza: {sig.confidence_score}%"
+
+    if current_price is not None and sig.entry_price:
+        pnl_pct = ((current_price - sig.entry_price) / sig.entry_price) * 100
+        if sig.direction == "SHORT":
+            pnl_pct = -pnl_pct
+        pnl_str = f"{'🟢' if pnl_pct > 0 else '🔴'} {pnl_pct:+.2f}%"
+    else:
+        pnl_str = "⚪ N/A"
+
+    # Líneas de precios
+    entry_str = _fmt_price(sig.entry_price)
+    target_str = f"{_fmt_price(sig.target_price_min)}~{_fmt_price(sig.target_price_max)}"
+
+    if current_price is not None:
+        now_str = _fmt_price(current_price)
+        mid_line = f"💵 Entry    📈 Now      🎯 Target"
+        price_line = f"{entry_str}  →  {now_str}  →  {target_str}"
+        bottom = f"        {pnl_str}     ⏳ PENDIENTE"
+    else:
+        # Historial: usar exit_price si existe
+        if sig.exit_price:
+            now_str = _fmt_price(sig.exit_price)
+            mid_line = f"💵 Entry    📈 Exit      🎯 Target"
+            price_line = f"{entry_str}  →  {now_str}  →  {target_str}"
+            status_emoji = {
+                "HIT_MIN": "🟢", "HIT_MAX": "🚀", "PARTIAL": "🟡",
+                "MISS": "🔴", "STALE": "⚪", "PENDING": "⏳",
+            }.get(sig.status, "❓")
+            bottom = f"        {pnl_str}     {status_emoji} {sig.status}"
+        else:
+            mid_line = f"💵 Entry              🎯 Target"
+            price_line = f"{entry_str}           →  {target_str}"
+            bottom = f"        {pnl_str}     ⏳ PENDIENTE"
+
+    return (
+        f"┌────────────────────────────────────┐\n"
+        f"│ {dir_emoji} {sig.direction} #{sig.rank or '?'}      {sig.pair:<18}│\n"
+        f"│ {conf_line:<34}│\n"
+        f"├────────────────────────────────────┤\n"
+        f"│ {mid_line:<34}│\n"
+        f"│ {price_line:<34}│\n"
+        f"└────────────────────────────────────┘\n"
+        f"{bottom}\n"
+    )
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Mensaje de bienvenida y registro del dueño."""
     chat_id = update.effective_chat.id
-    # Registrar dueño si no existe
     if "owner_chat_id" not in context.application.bot_data:
         context.application.bot_data["owner_chat_id"] = chat_id
         logger.info("Owner registered: %s", chat_id)
@@ -95,20 +148,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     lines = ["📜 <b>Últimas señales</b>\n"]
     for sig in signals:
-        status_emoji = {
-            "PENDING": "⏳",
-            "HIT_MIN": "🟢",
-            "HIT_MAX": "🚀",
-            "PARTIAL": "🟡",
-            "MISS": "🔴",
-            "STALE": "⚪",
-        }.get(sig.status, "❓")
-        acc = sig.accuracy or "PENDIENTE"
-        lines.append(
-            f"{status_emoji} <b>{sig.pair}</b> | {sig.direction} | Conf: {sig.confidence_score}%\n"
-            f"   Entry: ${sig.entry_price:,.4f} | Status: {sig.status} | {acc}\n"
-        )
-
+        lines.append(_ticket_status(sig))
     await update.message.reply_text("\n".join(lines), parse_mode="HTML", reply_markup=back_button())
 
 
@@ -150,7 +190,6 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         hours = int(data.split("_")[-1])
         settings.ANALYSIS_WINDOW_HOURS = hours
         settings.save()
-        # Re-programar scheduler
         scheduler: BotScheduler = context.application.bot_data.get("scheduler")
         if scheduler:
             scheduler.reschedule_analysis()
@@ -170,19 +209,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
         lines = ["📜 <b>Últimas señales</b>\n"]
         for sig in signals:
-            status_emoji = {
-                "PENDING": "⏳",
-                "HIT_MIN": "🟢",
-                "HIT_MAX": "🚀",
-                "PARTIAL": "🟡",
-                "MISS": "🔴",
-                "STALE": "⚪",
-            }.get(sig.status, "❓")
-            acc = sig.accuracy or "PENDIENTE"
-            lines.append(
-                f"{status_emoji} <b>{sig.pair}</b> | {sig.direction} | Conf: {sig.confidence_score}%\n"
-                f"   Entry: ${sig.entry_price:,.4f} | Status: {sig.status} | {acc}\n"
-            )
+            lines.append(_ticket_status(sig))
         await query.edit_message_text("\n".join(lines), parse_mode="HTML", reply_markup=back_button())
 
 
@@ -218,22 +245,7 @@ async def _send_status(chat_id: int, context: ContextTypes.DEFAULT_TYPE, edit_me
         sym = sig.pair.replace("/USDT", "").replace("/USD", "").upper()
         gid = coingecko.id_from_symbol(sym)
         current_price = prices.get(gid) if gid else None
-
-        if current_price and sig.entry_price:
-            pnl_pct = ((current_price - sig.entry_price) / sig.entry_price) * 100
-            if sig.direction == "SHORT":
-                pnl_pct = -pnl_pct  # Invertir para SHORT
-            pnl_emoji = "🟢" if pnl_pct > 0 else ("🔴" if pnl_pct < 0 else "⚪")
-            price_line = f"   Entry: ${sig.entry_price:,.4f} → Now: ${current_price:,.4f} ({pnl_emoji} {pnl_pct:+.2f}%)"
-        else:
-            price_line = f"   Entry: ${sig.entry_price:,.4f} → Now: (no disponible)"
-
-        target_line = f"   Target: ${sig.target_price_min:,.4f} - ${sig.target_price_max:,.4f}"
-        lines.append(
-            f"#{sig.rank or '?'} <b>{sig.pair}</b> | {sig.direction} | Conf: {sig.confidence_score}%\n"
-            f"{price_line}\n"
-            f"{target_line}\n"
-        )
+        lines.append(_ticket_status(sig, current_price))
 
     text = "\n".join(lines)
     if edit_message_id:
