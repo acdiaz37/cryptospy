@@ -31,19 +31,47 @@ class BotScheduler:
         asyncio.create_task(self._restore_pending_checks())
         logger.info("Scheduler started with window=%dh", settings.ANALYSIS_WINDOW_HOURS)
 
-    def _schedule_analysis(self):
-        """Programa el análisis periódico según ANALYSIS_WINDOW_HOURS."""
+    def _schedule_analysis(self, force_now: bool = False):
+        """Programa el análisis periódico según ANALYSIS_WINDOW_HOURS.
+        
+        Si force_now=False, consulta el historial para evitar ejecutar Grok
+        innecesariamente al reiniciar el bot.
+        """
+        from datetime import timezone
         # Quitar job anterior si existe
         self.scheduler.remove_all_jobs(jobstore=None)
+        
+        next_run = datetime.now(timezone.utc)
+        
+        if not force_now:
+            last_ts = self.sheets.get_last_signal_timestamp()
+            if last_ts:
+                window = timedelta(hours=settings.ANALYSIS_WINDOW_HOURS)
+                elapsed = datetime.now(timezone.utc) - last_ts
+                if elapsed < window:
+                    # Aún no toca, esperar hasta completar la ventana
+                    next_run = last_ts + window
+                    logger.info(
+                        "Last analysis was %s ago. Skipping immediate run. Next analysis at %s",
+                        elapsed,
+                        next_run
+                    )
+                else:
+                    logger.info("Last analysis was %s ago. Running now.", elapsed)
+            else:
+                logger.info("No previous analysis found. Running now.")
+        else:
+            logger.info("Forced immediate analysis.")
+        
         trigger = IntervalTrigger(hours=settings.ANALYSIS_WINDOW_HOURS)
         self.scheduler.add_job(
             self._run_analysis,
             trigger=trigger,
             id="periodic_analysis",
             replace_existing=True,
-            next_run_time=datetime.now(),  # Primera ejecución inmediata al arrancar
+            next_run_time=next_run,
         )
-        logger.info("Next analysis scheduled in %d hours", settings.ANALYSIS_WINDOW_HOURS)
+        logger.info("Next analysis scheduled for %s", next_run)
 
     def reschedule_analysis(self):
         """Re-programa el análisis cuando cambia la ventana de tiempo."""

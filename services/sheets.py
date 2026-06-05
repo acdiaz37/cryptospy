@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import gspread
@@ -97,8 +97,8 @@ class SheetsClient:
                             actual_move_pct: float, accuracy: str) -> None:
         """Actualiza una fila existente con los resultados de verificación."""
         try:
-            # Buscar la fila por signal_id (columna A)
-            cell = self.sheet.find(signal_id, in_column=1)
+            # Buscar la fila por signal_id (columna B, índice 2)
+            cell = self.sheet.find(signal_id, in_column=2)
             if not cell:
                 logger.warning("Signal %s not found for update", signal_id)
                 return
@@ -109,7 +109,7 @@ class SheetsClient:
                 (row_idx, 21, exit_price),
                 (row_idx, 22, actual_move_pct),
                 (row_idx, 23, accuracy),
-                (row_idx, 24, datetime.utcnow().isoformat() + "Z"),
+                (row_idx, 24, datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")),
             ]
             for r, c, val in updates:
                 self.sheet.update_cell(r, c, val)
@@ -152,3 +152,19 @@ class SheetsClient:
         except Exception as e:
             logger.error("Error reading recent signals: %s", e)
             return []
+
+    def get_last_signal_timestamp(self) -> Optional[datetime]:
+        """Devuelve el timestamp de la señal más reciente, o None si no hay."""
+        try:
+            self._ensure_headers()
+            records = self.sheet.get_all_records()
+            if not records:
+                return None
+            # Ordenar por timestamp descendente
+            records.sort(key=lambda r: str(r.get("timestamp_utc", "")), reverse=True)
+            last_ts_str = records[0].get("timestamp_utc")
+            if last_ts_str:
+                return datetime.fromisoformat(last_ts_str.replace("Z", "+00:00"))
+        except Exception as e:
+            logger.warning("Error reading last signal timestamp: %s", e)
+        return None
