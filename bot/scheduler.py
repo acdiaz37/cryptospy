@@ -41,7 +41,7 @@ class BotScheduler:
             trigger=trigger,
             id="periodic_analysis",
             replace_existing=True,
-            next_run_time=datetime.now() + timedelta(minutes=2),  # Primera ejecución 2 min después de arrancar
+            next_run_time=datetime.now(),  # Primera ejecución inmediata al arrancar
         )
         logger.info("Next analysis scheduled in %d hours", settings.ANALYSIS_WINDOW_HOURS)
 
