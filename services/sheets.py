@@ -118,6 +118,16 @@ class SheetsClient:
             logger.error("Error updating signal %s: %s", signal_id, e)
             raise
 
+    def _clean_record(self, rec: dict) -> dict:
+        """Convierte strings vacíos a None para que Pydantic no falle."""
+        cleaned = {}
+        for k, v in rec.items():
+            if v == "":
+                cleaned[k] = None
+            else:
+                cleaned[k] = v
+        return cleaned
+
     def get_pending_signals(self) -> list[SignalRecord]:
         """Devuelve todas las señales con status PENDING."""
         try:
@@ -127,7 +137,7 @@ class SheetsClient:
             for rec in records:
                 if rec.get("status") == "PENDING":
                     try:
-                        pending.append(SignalRecord(**rec))
+                        pending.append(SignalRecord(**self._clean_record(rec)))
                     except Exception as e:
                         logger.warning("Invalid pending record skipped: %s", e)
             return pending
@@ -145,7 +155,7 @@ class SheetsClient:
             result = []
             for rec in records[:limit]:
                 try:
-                    result.append(SignalRecord(**rec))
+                    result.append(SignalRecord(**self._clean_record(rec)))
                 except Exception:
                     continue
             return result
