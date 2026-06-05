@@ -21,53 +21,52 @@ def _fmt_price(val: float | None) -> str:
 
 
 def _ticket_status(sig, current_price: float | None = None) -> str:
-    """Formatea una señal estilo ticket/recibo para Telegram."""
+    """Formatea una señal estilo tarjeta clara para celular."""
     dir_emoji = "🟢" if sig.direction == "LONG" else "🔴"
-    conf_line = f"📊 Confianza: {sig.confidence_score}%"
+    lines = [
+        "━━━━━━━━━━━━━━",
+        f"🔮 SEÑAL #{sig.rank or '?'}",
+        f"🪙 {sig.pair}",
+        f"{dir_emoji} {sig.direction} | 📊 Conf: {sig.confidence_score}%",
+        "━━━━━━━━━━━━━━",
+    ]
+
+    # Precios y P&L
+    entry_str = _fmt_price(sig.entry_price)
+    target_str = f"{_fmt_price(sig.target_price_min)}~{_fmt_price(sig.target_price_max)}"
 
     if current_price is not None and sig.entry_price:
         pnl_pct = ((current_price - sig.entry_price) / sig.entry_price) * 100
         if sig.direction == "SHORT":
             pnl_pct = -pnl_pct
-        pnl_str = f"{'🟢' if pnl_pct > 0 else '🔴'} {pnl_pct:+.2f}%"
+        pnl_emoji = "🟢" if pnl_pct > 0 else ("🔴" if pnl_pct < 0 else "⚪")
+        lines.append(f"💵 Entry:  {entry_str}")
+        lines.append(f"📈 Now:    {_fmt_price(current_price)}")
+        lines.append(f"📊 P&L:    {pnl_emoji} {pnl_pct:+.2f}%")
+        lines.append(f"🎯 Target: {target_str}")
+        lines.append("")
+        lines.append("⏳ PENDIENTE")
     else:
-        pnl_str = "⚪ N/A"
-
-    # Líneas de precios
-    entry_str = _fmt_price(sig.entry_price)
-    target_str = f"{_fmt_price(sig.target_price_min)}~{_fmt_price(sig.target_price_max)}"
-
-    if current_price is not None:
-        now_str = _fmt_price(current_price)
-        mid_line = f"💵 Entry    📈 Now      🎯 Target"
-        price_line = f"{entry_str}  →  {now_str}  →  {target_str}"
-        bottom = f"        {pnl_str}     ⏳ PENDIENTE"
-    else:
-        # Historial: usar exit_price si existe
+        # Historial
         if sig.exit_price:
-            now_str = _fmt_price(sig.exit_price)
-            mid_line = f"💵 Entry    📈 Exit      🎯 Target"
-            price_line = f"{entry_str}  →  {now_str}  →  {target_str}"
-            status_emoji = {
+            pnl_emoji = {
                 "HIT_MIN": "🟢", "HIT_MAX": "🚀", "PARTIAL": "🟡",
                 "MISS": "🔴", "STALE": "⚪", "PENDING": "⏳",
             }.get(sig.status, "❓")
-            bottom = f"        {pnl_str}     {status_emoji} {sig.status}"
+            pnl_str = f"{pnl_emoji} {sig.actual_move_pct:+.2f}%" if sig.actual_move_pct is not None else "⚪ N/A"
+            lines.append(f"💵 Entry:  {entry_str}")
+            lines.append(f"📈 Exit:   {_fmt_price(sig.exit_price)}")
+            lines.append(f"📊 P&L:    {pnl_str}")
+            lines.append(f"🎯 Target: {target_str}")
+            lines.append("")
+            lines.append(f"{pnl_emoji} {sig.status}")
         else:
-            mid_line = f"💵 Entry              🎯 Target"
-            price_line = f"{entry_str}           →  {target_str}"
-            bottom = f"        {pnl_str}     ⏳ PENDIENTE"
+            lines.append(f"💵 Entry:  {entry_str}")
+            lines.append(f"🎯 Target: {target_str}")
+            lines.append("")
+            lines.append("⏳ PENDIENTE")
 
-    return (
-        f"┌────────────────────────────────────┐\n"
-        f"│ {dir_emoji} {sig.direction} #{sig.rank or '?'}      {sig.pair:<18}│\n"
-        f"│ {conf_line:<34}│\n"
-        f"├────────────────────────────────────┤\n"
-        f"│ {mid_line:<34}│\n"
-        f"│ {price_line:<34}│\n"
-        f"└────────────────────────────────────┘\n"
-        f"{bottom}\n"
-    )
+    return "\n".join(lines) + "\n"
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
