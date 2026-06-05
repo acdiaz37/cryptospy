@@ -148,7 +148,13 @@ class BotScheduler:
             # 3. Procesar cada señal
             await self._send_progress(chat_id, "💾 <b>Guardando señales en Google Sheets...</b>")
             count = 0
+            seen_pairs = set()
             for sig in response.signals:
+                if sig.pair in seen_pairs:
+                    logger.warning("Duplicate pair skipped: %s", sig.pair)
+                    continue
+                seen_pairs.add(sig.pair)
+
                 symbol = sig.pair.replace("/USDT", "").replace("/USD", "").upper()
                 gecko_id = self.coingecko.id_from_symbol(symbol)
                 if not gecko_id or gecko_id not in prices:
