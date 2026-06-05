@@ -108,28 +108,47 @@ class BotScheduler:
         except Exception as e:
             logger.error("Error restoring pending checks: %s", e)
 
+    async def _send_progress(self, chat_id: int | None, message: str) -> None:
+        """Envía mensaje de progreso a Telegram y loguea en consola."""
+        # Limpiar emojis para la consola (Windows no los soporta bien)
+        clean = message.replace("🔮", "[ANALISIS]").replace("📊", "[PRECIOS]").replace("🤖", "[GROK]").replace("💾", "[SHEET]").replace("✅", "[OK]").replace("❌", "[ERROR]")
+        logger.info(clean)
+        if chat_id:
+            try:
+                await self.app.bot.send_message(chat_id, message, parse_mode="HTML")
+            except Exception:
+                pass
+
     async def _run_analysis(self):
         """Ejecuta el análisis completo: precios -> Grok -> Sheet -> notificación."""
+        from datetime import timezone
         chat_id = self._get_owner_chat_id()
         try:
+            await self._send_progress(chat_id, "🔮 <b>Iniciando análisis...</b>")
+
             # 1. Obtener precios actuales
+            await self._send_progress(chat_id, "📊 <b>Consultando precios en CoinGecko...</b>")
             prices = await self.coingecko.get_prices()
             if not prices:
-                logger.error("No prices fetched from CoinGecko")
+                await self._send_progress(chat_id, "❌ <b>Error:</b> No se pudieron obtener precios de CoinGecko.")
                 return
+            await self._send_progress(chat_id, f"✅ <b>Precios obtenidos:</b> {len(prices)} activos.")
 
             # 2. Llamar a Grok
+            await self._send_progress(chat_id, "🤖 <b>Consultando Grok/xAI...</b>")
             response = await self.grok.fetch_signals()
             if not response:
-                logger.error("Grok returned no response")
-                if chat_id:
-                    await self.app.bot.send_message(chat_id, "❌ El análisis falló. Revisá los logs.")
+                await self._send_progress(chat_id, "❌ <b>Error:</b> Grok no devolvió respuesta. Revisá los logs.")
                 return
+            await self._send_progress(
+                chat_id,
+                f"✅ <b>Grok respondió:</b> {response.selection_summary.signals_selected} señales detectadas."
+            )
 
             # 3. Procesar cada señal
+            await self._send_progress(chat_id, "💾 <b>Guardando señales en Google Sheets...</b>")
             count = 0
             for sig in response.signals:
-                # Buscar CoinGecko ID del par
                 symbol = sig.pair.replace("/USDT", "").replace("/USD", "").upper()
                 gecko_id = self.coingecko.id_from_symbol(symbol)
                 if not gecko_id or gecko_id not in prices:
@@ -169,12 +188,11 @@ class BotScheduler:
                     narrative=sig.narrative,
                 )
 
-                # Guardar en sheet
                 self.sheets.append_signal(record)
                 count += 1
 
                 # Programar verificación
-                check_time = datetime.utcnow() + timedelta(hours=response.analysis_window_hours)
+                check_time = datetime.now(timezone.utc) + timedelta(hours=response.analysis_window_hours)
                 self.scheduler.add_job(
                     self._run_verification,
                     trigger="date",
@@ -184,10 +202,12 @@ class BotScheduler:
                     replace_existing=True,
                 )
 
+            await self._send_progress(chat_id, f"✅ <b>Señales guardadas:</b> {count} en Google Sheets.")
+
             # 4. Notificar resumen
             if chat_id:
                 summary = (
-                    f"🔮 <b>Análisis completado</b>\n"
+                    f"🎯 <b>Análisis completado</b>\n\n"
                     f"Ventana: {response.analysis_window_hours}h\n"
                     f"Señales: {count} ({response.selection_summary.long_signals} LONG, "
                     f"{response.selection_summary.short_signals} SHORT)\n"
@@ -198,8 +218,7 @@ class BotScheduler:
 
         except Exception as e:
             logger.exception("Error in scheduled analysis: %s", e)
-            if chat_id:
-                await self.app.bot.send_message(chat_id, f"❌ Error en análisis automático: {e}")
+            await self._send_progress(chat_id, f"❌ <b>Error en análisis:</b> {e}")
 
     async def _run_verification(self, signal_id: str, pair: str, entry_price: float,
                                 direction: str, expected_min_pct: float, expected_max_pct: float):

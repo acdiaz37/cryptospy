@@ -5,7 +5,8 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 
 from config import settings
-from bot.handlers import start, analyze_command, status_command, settings_command, history_command, callback_router
+from core.logger import setup_logging
+from bot.handlers import start, analyze_command, status_command, settings_command, history_command, callback_router, help_command
 from bot.scheduler import BotScheduler
 
 
@@ -26,10 +27,7 @@ class TokenFilter(logging.Filter):
         return True
 
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
+setup_logging()
 
 # Silenciar logs de httpx que exponen URLs con token
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -46,7 +44,7 @@ async def post_init(application: Application) -> None:
     scheduler = BotScheduler(application)
     application.bot_data["scheduler"] = scheduler
     scheduler.start()
-    logger.info("Bot post_init complete. Scheduler started.")
+    logger.info("[bold green]Bot post_init complete. Scheduler started.[/bold green]")
 
 
 async def post_shutdown(application: Application) -> None:
@@ -72,6 +70,7 @@ def main() -> None:
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("settings", settings_command))
     application.add_handler(CommandHandler("history", history_command))
+    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CallbackQueryHandler(callback_router))
 
     if settings.ENV == "development":

@@ -12,6 +12,9 @@ def main_menu() -> InlineKeyboardMarkup:
                 InlineKeyboardButton("⚙️ Configuración", callback_data="settings"),
                 InlineKeyboardButton("📜 Historial", callback_data="history"),
             ],
+            [
+                InlineKeyboardButton("❓ Ayuda", callback_data="help"),
+            ],
         ]
     )
 
@@ -20,9 +23,9 @@ def settings_menu(current_window: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("12h", callback_data="set_window_12"),
-                InlineKeyboardButton("24h", callback_data="set_window_24"),
-                InlineKeyboardButton("48h", callback_data="set_window_48"),
+                InlineKeyboardButton("12 horas", callback_data="set_window_12"),
+                InlineKeyboardButton("24 horas", callback_data="set_window_24"),
+                InlineKeyboardButton("48 horas", callback_data="set_window_48"),
             ],
             [
                 InlineKeyboardButton("🔙 Volver", callback_data="main_menu"),

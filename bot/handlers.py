@@ -59,6 +59,33 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     )
 
 
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Muestra ayuda con todos los comandos disponibles."""
+    text = (
+        "<b>📖 CryptoSpy - Ayuda</b>\n\n"
+        "<b>Comandos disponibles:</b>\n"
+        "• /start - Menú principal con botones\n"
+        "• /analyze - Ejecutar análisis de señales AHORA (consume créditos Grok)\n"
+        "• /status - Ver señales activas con precios en vivo\n"
+        "• /settings - Cambiar ventana de tiempo (12h / 24h / 48h)\n"
+        "• /history - Ver últimas señales generadas\n"
+        "• /help - Mostrar esta ayuda\n\n"
+        "<b>Cómo funciona el bot:</b>\n"
+        "1. Cada X horas (según configuración) consulta precios en CoinGecko\n"
+        "2. Envía los datos a Grok (IA con acceso a X/Twitter)\n"
+        "3. Recibe señales LONG/SHORT y las guarda en Google Sheets\n"
+        "4. Al cabo de la ventana de tiempo, verifica si se cumplieron\n\n"
+        "<b>Notas:</b>\n"
+        "• El análisis automático no se repite al reiniciar si ya se hizo recientemente\n"
+        "• /analyze siempre funciona manualmente cuando vos querás\n"
+        "• Las señales se guardan automáticamente en tu Google Sheet"
+    )
+    if update.callback_query:
+        await update.callback_query.edit_message_text(text, parse_mode="HTML", reply_markup=back_button())
+    else:
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=back_button())
+
+
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Muestra últimas señales del historial."""
     signals = sheets.get_recent_signals(limit=10)
@@ -132,6 +159,9 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             f"El próximo análisis y las verificaciones usarán esta nueva ventana."
         )
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=back_button())
+
+    elif data == "help":
+        await help_command(update, context)
 
     elif data == "history":
         signals = sheets.get_recent_signals(limit=10)
