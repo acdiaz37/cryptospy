@@ -17,13 +17,13 @@ from services.sheets import SheetsClient
 
 
 def main():
-    print("🔗 Conectando a Google Sheets...")
+    print("Conectando a Google Sheets...")
     client = SheetsClient()
-    print("✅ Conexión exitosa.")
-    print("📝 Verificando / creando headers...")
+    print("Conexion exitosa.")
+    print("Verificando / creando headers...")
     client._ensure_headers()
-    print("✅ Listo. Las columnas están creadas en tu hoja.")
-    print("📊 Abrí Google Sheets y deberías ver la primera fila con todos los nombres de columna.")
+    print("Listo. Las columnas estan creadas en tu hoja.")
+    print("Abri Google Sheets y deberias ver la primera fila con todos los nombres de columna.")
 
 
 if __name__ == "__main__":

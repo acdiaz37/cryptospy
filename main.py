@@ -1,5 +1,5 @@
-import asyncio
 import logging
+import re
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler
@@ -8,10 +8,36 @@ from config import settings
 from bot.handlers import start, analyze_command, status_command, settings_command, history_command, callback_router
 from bot.scheduler import BotScheduler
 
+
+class TokenFilter(logging.Filter):
+    """Ofusca el BOT_TOKEN de los logs."""
+
+    def filter(self, record):
+        if hasattr(record, "msg") and isinstance(record.msg, str):
+            record.msg = re.sub(r"bot\d+:[A-Za-z0-9_-]{35}", "bot***:***", record.msg)
+        if hasattr(record, "args"):
+            new_args = []
+            for arg in record.args:
+                if isinstance(arg, str):
+                    new_args.append(re.sub(r"bot\d+:[A-Za-z0-9_-]{35}", "bot***:***", arg))
+                else:
+                    new_args.append(arg)
+            record.args = tuple(new_args)
+        return True
+
+
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
+
+# Silenciar logs de httpx que exponen URLs con token
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
+# Aplicar filtro de token a loggers relevantes
+for logger_name in ("telegram.ext.Application", "httpx", "__main__"):
+    logging.getLogger(logger_name).addFilter(TokenFilter())
+
 logger = logging.getLogger(__name__)
 
 

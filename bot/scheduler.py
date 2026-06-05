@@ -27,7 +27,8 @@ class BotScheduler:
         # Programar análisis periódico
         self._schedule_analysis()
         # Re-programar verificaciones de señales PENDING
-        self.app.create_task(self._restore_pending_checks())
+        import asyncio
+        asyncio.create_task(self._restore_pending_checks())
         logger.info("Scheduler started with window=%dh", settings.ANALYSIS_WINDOW_HOURS)
 
     def _schedule_analysis(self):
