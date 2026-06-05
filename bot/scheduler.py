@@ -120,6 +120,7 @@ class BotScheduler:
 
                 signal_id = f"{response.timestamp_utc}_{sig.rank}"
                 record = SignalRecord(
+                    rank=sig.rank,
                     signal_id=signal_id,
                     timestamp_utc=response.timestamp_utc,
                     analysis_window_hours=response.analysis_window_hours,

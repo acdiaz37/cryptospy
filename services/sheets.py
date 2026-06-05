@@ -18,7 +18,7 @@ SCOPES = [
 
 # Headers exactos según ARCHITECTURE.md
 HEADERS = [
-    "signal_id", "timestamp_utc", "analysis_window_hours", "pair", "asset_name",
+    "rank", "signal_id", "timestamp_utc", "analysis_window_hours", "pair", "asset_name",
     "direction", "entry_price", "expected_min_pct", "expected_max_pct",
     "target_price_min", "target_price_max", "confidence_score", "bullish_score",
     "bearish_score", "expected_edge", "primary_catalyst", "narrative",
@@ -59,6 +59,7 @@ class SheetsClient:
     def append_signal(self, record: SignalRecord) -> None:
         self._ensure_headers()
         row = [
+            record.rank,
             record.signal_id,
             record.timestamp_utc,
             record.analysis_window_hours,
@@ -102,13 +103,13 @@ class SheetsClient:
                 logger.warning("Signal %s not found for update", signal_id)
                 return
             row_idx = cell.row
-            # Columnas: S=status(19), T=exit_price(20), U=actual_move_pct(21), V=accuracy(22), W=check_timestamp(23)
+            # Columnas: T=status(20), U=exit_price(21), V=actual_move_pct(22), W=accuracy(23), X=check_timestamp(24)
             updates = [
-                (row_idx, 19, status),
-                (row_idx, 20, exit_price),
-                (row_idx, 21, actual_move_pct),
-                (row_idx, 22, accuracy),
-                (row_idx, 23, datetime.utcnow().isoformat() + "Z"),
+                (row_idx, 20, status),
+                (row_idx, 21, exit_price),
+                (row_idx, 22, actual_move_pct),
+                (row_idx, 23, accuracy),
+                (row_idx, 24, datetime.utcnow().isoformat() + "Z"),
             ]
             for r, c, val in updates:
                 self.sheet.update_cell(r, c, val)

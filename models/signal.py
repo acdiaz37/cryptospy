@@ -49,6 +49,7 @@ class SignalResponse(BaseModel):
 
 
 class SignalRecord(BaseModel):
+    rank: int = 0
     signal_id: str
     timestamp_utc: str
     analysis_window_hours: int
