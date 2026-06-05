@@ -2,9 +2,11 @@ import asyncio
 import logging
 
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 
 from config import settings
+from bot.handlers import start, analyze_command, status_command, settings_command, history_command, callback_router
+from bot.scheduler import BotScheduler
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -13,44 +15,51 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        f"¡Hola {update.effective_user.first_name}! Soy CryptoSpy 🤖"
+async def post_init(application: Application) -> None:
+    """Callback ejecutado después de que la app está lista."""
+    scheduler = BotScheduler(application)
+    application.bot_data["scheduler"] = scheduler
+    scheduler.start()
+    logger.info("Bot post_init complete. Scheduler started.")
+
+
+async def post_shutdown(application: Application) -> None:
+    """Callback ejecutado antes de apagar."""
+    scheduler: BotScheduler = application.bot_data.get("scheduler")
+    if scheduler:
+        scheduler.scheduler.shutdown(wait=False)
+        logger.info("Scheduler shutdown.")
+
+
+def main() -> None:
+    application = (
+        Application.builder()
+        .token(settings.BOT_TOKEN)
+        .post_init(post_init)
+        .post_shutdown(post_shutdown)
+        .build()
     )
 
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        "Comandos disponibles:\n/start - Iniciar\n/help - Ayuda"
-    )
-
-
-async def main() -> None:
-    application = Application.builder().token(settings.BOT_TOKEN).build()
-
+    # Handlers
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("analyze", analyze_command))
+    application.add_handler(CommandHandler("status", status_command))
+    application.add_handler(CommandHandler("settings", settings_command))
+    application.add_handler(CommandHandler("history", history_command))
+    application.add_handler(CallbackQueryHandler(callback_router))
 
     if settings.ENV == "development":
         logger.info("Modo: POLLING (desarrollo)")
-        await application.initialize()
-        await application.start()
-        await application.updater.start_polling(drop_pending_updates=True)
-        await application.updater.idle()
-        await application.stop()
+        application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
     else:
         logger.info("Modo: WEBHOOK (producción)")
-        await application.initialize()
-        await application.start()
-        await application.updater.start_webhook(
+        application.run_webhook(
             listen="0.0.0.0",
             port=settings.WEBHOOK_PORT,
             webhook_url=settings.WEBHOOK_URL,
             drop_pending_updates=True,
         )
-        await application.updater.idle()
-        await application.stop()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
