@@ -166,11 +166,12 @@ class BotScheduler:
                     target_min = entry_price * (1 - min_pct / 100)
                     target_max = entry_price * (1 - max_pct / 100)
 
-                signal_id = f"{response.timestamp_utc}_{sig.rank}"
+                now_utc = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                signal_id = f"{now_utc}_{sig.rank}"
                 record = SignalRecord(
                     rank=sig.rank,
                     signal_id=signal_id,
-                    timestamp_utc=response.timestamp_utc,
+                    timestamp_utc=now_utc,
                     analysis_window_hours=response.analysis_window_hours,
                     pair=sig.pair,
                     asset_name=sig.asset_name,

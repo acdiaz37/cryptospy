@@ -119,13 +119,17 @@ class SheetsClient:
             raise
 
     def _clean_record(self, rec: dict) -> dict:
-        """Convierte strings vacíos a None para que Pydantic no falle."""
-        cleaned = {}
-        for k, v in rec.items():
-            if v == "":
-                cleaned[k] = None
-            else:
-                cleaned[k] = v
+        """Convierte strings vacíos a None solo en campos numéricos."""
+        cleaned = dict(rec)
+        numeric_fields = {
+            "entry_price", "expected_min_pct", "expected_max_pct",
+            "target_price_min", "target_price_max", "confidence_score",
+            "bullish_score", "bearish_score", "expected_edge",
+            "exit_price", "actual_move_pct", "rank",
+        }
+        for key in numeric_fields:
+            if key in cleaned and cleaned[key] == "":
+                cleaned[key] = None
         return cleaned
 
     def get_pending_signals(self) -> list[SignalRecord]:

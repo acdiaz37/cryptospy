@@ -70,6 +70,6 @@ class SignalRecord(BaseModel):
     status: Literal["PENDING", "HIT_MIN", "HIT_MAX", "PARTIAL", "MISS", "STALE"] = "PENDING"
     exit_price: float | None = None
     actual_move_pct: float | None = None
-    accuracy: Literal["CORRECT", "PARTIAL", "INCORRECT", ""] = ""
-    check_timestamp_utc: str = ""
-    notes: str = ""
+    accuracy: Literal["CORRECT", "PARTIAL", "INCORRECT", ""] | None = ""
+    check_timestamp_utc: str | None = ""
+    notes: str | None = ""
