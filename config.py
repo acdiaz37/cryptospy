@@ -1,9 +1,19 @@
-import os
 import json
+import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
 
 
+def _load_json(filename: str) -> dict:
+    path = Path(filename)
+    if not path.exists():
+        raise FileNotFoundError(f"Required config file not found: {filename}")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+# ─────────────────────────────────────────────
+# 1. Variables sensibles / por entorno → .env
+# ─────────────────────────────────────────────
 ENV_PATH = Path(".env")
 
 
@@ -47,70 +57,20 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-ASSET_UNIVERSE = [
-    "bitcoin", "ethereum", "solana", "ripple", "chainlink",
-    "avalanche-2", "hyperliquid", "injective-protocol", "fetch-ai",
-    "cardano", "polkadot", "polygon", "arbitrum", "optimism",
-    "near", "aptos", "sui", "celestia", "dydx", "render-token",
-    "immutable-x", "mantle", "filecoin", "cosmos", "algorand",
-    "stellar", "vechain", "tron", "litecoin", "bitcoin-cash",
-    "uniswap", "aave", "maker", "lido-dao", "curve-dao-token",
-    "synthetix-network-token", "compound-governance-token",
-    "the-graph", "1inch", "pancakeswap-token", "cosmos-hub",
-    "ethereum-classic", "okb", "leo-token", "crypto-com-chain",
-    "kaspa", "bonk", "pepe", "shiba-inu", "dogecoin"
-]
+# ─────────────────────────────────────────────
+# 2. Assets / Universo de criptos → JSON
+# ─────────────────────────────────────────────
+_assets_config = _load_json("config/assets.json")
+ASSET_UNIVERSE: list[str] = _assets_config["universe"]
+ASSET_SYMBOLS: dict[str, str] = _assets_config["symbols"]
 
-# Mapeo de CoinGecko ID a símbolo de par (para mostrar y para consultas)
-ASSET_SYMBOLS = {
-    "bitcoin": "BTC",
-    "ethereum": "ETH",
-    "solana": "SOL",
-    "ripple": "XRP",
-    "chainlink": "LINK",
-    "avalanche-2": "AVAX",
-    "hyperliquid": "HYPE",
-    "injective-protocol": "INJ",
-    "fetch-ai": "FET",
-    "cardano": "ADA",
-    "polkadot": "DOT",
-    "polygon": "MATIC",
-    "arbitrum": "ARB",
-    "optimism": "OP",
-    "near": "NEAR",
-    "aptos": "APT",
-    "sui": "SUI",
-    "celestia": "TIA",
-    "dydx": "DYDX",
-    "render-token": "RENDER",
-    "immutable-x": "IMX",
-    "mantle": "MNT",
-    "filecoin": "FIL",
-    "cosmos": "ATOM",
-    "algorand": "ALGO",
-    "stellar": "XLM",
-    "vechain": "VET",
-    "tron": "TRX",
-    "litecoin": "LTC",
-    "bitcoin-cash": "BCH",
-    "uniswap": "UNI",
-    "aave": "AAVE",
-    "maker": "MKR",
-    "lido-dao": "LDO",
-    "curve-dao-token": "CRV",
-    "synthetix-network-token": "SNX",
-    "compound-governance-token": "COMP",
-    "the-graph": "GRT",
-    "1inch": "1INCH",
-    "pancakeswap-token": "CAKE",
-    "cosmos-hub": "ATOM",
-    "ethereum-classic": "ETC",
-    "okb": "OKB",
-    "leo-token": "LEO",
-    "crypto-com-chain": "CRO",
-    "kaspa": "KAS",
-    "bonk": "BONK",
-    "pepe": "PEPE",
-    "shiba-inu": "SHIB",
-    "dogecoin": "DOGE",
-}
+
+# ─────────────────────────────────────────────
+# 3. Prompts → JSON
+# ─────────────────────────────────────────────
+_prompts_config = _load_json("prompts/analysis.json")
+PROMPT_MODEL: str = _prompts_config["model"]
+PROMPT_TEMPERATURE: float = _prompts_config["temperature"]
+PROMPT_MAX_TOKENS: int = _prompts_config["max_tokens"]
+PROMPT_SYSTEM_TEMPLATE: str = _prompts_config["system_prompt"]
+PROMPT_USER_TEMPLATE: str = _prompts_config["user_prompt_structure"]
